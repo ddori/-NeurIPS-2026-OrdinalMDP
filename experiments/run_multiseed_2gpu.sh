@@ -111,11 +111,24 @@ echo "============================================================"
 CUDA_VISIBLE_DEVICES=0 python exp10_multiseed.py eval "${ENV_NAME}" \
     2>&1 | tee "${LOG_DIR}/eval_${ENV_NAME}.log"
 
+echo ""
+echo "============================================================"
+echo "  Running deploy-or-adapt analysis (exp23)..."
+echo "  (Requires DR checkpoints + multiseed pkls for all envs present;"
+echo "   per-env slots with missing data are skipped automatically.)"
+echo "============================================================"
+CUDA_VISIBLE_DEVICES=0 python exp23_deploy_or_adapt.py \
+    2>&1 | tee "${LOG_DIR}/exp23_${ENV_NAME}.log" || true
+
 PKL_PATH="../cache_exp10/results_multiseed_${ENV_NAME}.pkl"
+DA_PKL="../cache_exp10/results_deploy_or_adapt.pkl"
+DA_TEX="../cache_exp10/results_deploy_or_adapt.tex"
 echo ""
 echo "============================================================"
 echo "  DONE."
-echo "  Result pickle (numbers only, no model weights):"
+echo "  Result pickles (numbers only, no model weights):"
 echo "    ${PKL_PATH}"
-echo "  Copy this file back to the main workstation for table/slope update."
+echo "    ${DA_PKL}"
+echo "    ${DA_TEX}"
+echo "  Copy these files back to the main workstation for table/slope update."
 echo "============================================================"

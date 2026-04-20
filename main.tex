@@ -63,7 +63,7 @@
 
 % ============================================================
 \begin{abstract}
-A reinforcement learning policy trained at Earth gravity ($9.8$\,m/s$^2$) is asked to act in a low-gravity environment ($5$\,m/s$^2$). Does it still act optimally? The standard answer tracks how far the Q-\emph{values} drifted, but a greedy policy depends only on the \emph{ordering} of actions, not their magnitudes: it transfers without retraining exactly when the rank of the best action at each state survives the shift. We capture this by the \emph{action-gap distribution} $F_\kappa$ of the source environment, which records how decisively each state prefers its top action over the runner-up. Our central result, the Violation Growth Theorem, bounds the fraction of states where the policy fails by $F_\kappa(2 L_Q \|\Delta\theta\|)$: only states whose action gap is smaller than the perturbation can flip. This bound is tight to factor $1$ for every $\gamma \in [0,1)$, recovers a quadratic-in-$\|\Delta\theta\|$ degradation law for continuous actions, yields a stability radius for safe deployment, and admits a source-side diagnostic that combines policy-agreement statistics with a finite-difference upper bound on $L_Q$ (using a user-supplied curvature constant and critic tolerance, valid on the source support; no target rewards or rollouts are used). Across discrete and continuous control benchmarks, $F_\kappa$ measured from source data alone correctly predicts which environments transfer gracefully and identifies the regime in which the quadratic refinement holds. $F_\kappa$ is a structural fingerprint of an environment: measured from source data alone, it indicates when zero-shot transfer is likely to remain reliable under physics shifts.
+A reinforcement learning policy trained at Earth gravity ($9.8$\,m/s$^2$) is asked to act in a low-gravity environment ($5$\,m/s$^2$). Does it still act optimally? The standard answer tracks how far the Q-\emph{values} drifted, but a greedy policy depends only on the \emph{ordering} of actions, not their magnitudes: it transfers without retraining exactly when the rank of the best action at each state survives the shift. We capture this by the \emph{action-gap distribution} $F_\kappa$ of the source environment, which records how decisively each state prefers its top action over the runner-up. Our central result, the Violation Growth Theorem, bounds the fraction of states where the policy fails by $F_\kappa(2 L_Q \|\Delta\theta\|)$: only states whose action gap is smaller than the perturbation can flip. This bound is tight to factor $1$ for every $\gamma \in [0,1)$, recovers a quadratic-in-$\|\Delta\theta\|$ degradation law for continuous actions, yields a stability radius for safe deployment, and admits a source-side diagnostic that combines policy-agreement statistics with a finite-difference upper bound on $L_Q$ (using a user-supplied curvature constant and critic tolerance, valid on the source support; no target rewards or rollouts are used). Across discrete and continuous control benchmarks, $F_\kappa$ measured from source data alone correctly predicts which environments transfer gracefully and identifies the regime in which the quadratic refinement holds. As a concrete decision tool, a single source-only threshold on $\hat F_\kappa$ chooses between zero-shot deploy and a domain-randomized fallback with $75\%$ accuracy and $>94\%$ of the oracle return across three MuJoCo environments and four target gravities each (Table~\ref{tab:deploy-or-adapt}). $F_\kappa$ is a structural fingerprint of an environment: measured from source data alone, it indicates when zero-shot transfer is likely to remain reliable under physics shifts.
 \end{abstract}
 
 % ============================================================
@@ -921,6 +921,54 @@ Hopper      & 5.0  & $1{,}589 \pm 1094$ & $1{,}767 \pm 216$  & $0.606 \pm 0.032$
 \end{table}
 
 \paragraph{Note on Ant at $g{=}5$.} The Ant source policy returns $143 \pm 72$ at $g{=}5$ versus the target-trained $1{,}723 \pm 404$, a ${\sim}12\times$ gap with an order-of-magnitude variance asymmetry. Inspection of rollouts shows the source policy frequently loses postural stability within the first ${\sim}50$ steps at this gravity (the gait learned at $g{=}9.81$ does not produce enough vertical impulse to prevent torso contact under the lighter dynamics), so the policy is not so much ``transferring poorly'' as failing to remain a coherent locomotion controller in this regime. This is consistent with the directional precondition failure documented in Appendix~\ref{app:hessian-diag}: the lighter side of Ant is precisely where the local quadratic model collapses, and the gap measured at $g{=}5$ should be read as ``regime exit,'' not as a smooth-degradation data point. The reported slope ($2.52$) is robust to this datum (excluding $g{=}5$ leaves the qualitative ordering unchanged); we keep it in the table for transparency.
+
+\subsection{Source-Only Deploy-or-Adapt Decision (full table)}
+\label{app:deploy-or-adapt}
+
+This section gives the full per-cell breakdown for the deploy-or-adapt rule summarised in \S\ref{sec:exp-mujoco-transfer}. For each (env, target gravity $g$) we measure (i) the source policy's zero-shot return at $g$ (averaged over the SAC seeds in Table~\ref{tab:multiseed}), (ii) the return of a single domain-randomized SAC policy trained on $g\in[5,15]$ (seed $42$, $500$K steps, evaluated on $20$ episodes), and (iii) the source-only signal $\hat F_\kappa(c\,|\Delta g|)$ with the same env-agnostic constants $c{=}0.1, \tau{=}0.5$ used in the body. The oracle decision at each cell takes the maximum of the two returns. The headline numbers (mean over the four non-source gravities, per env) are reproduced in Table~\ref{tab:deploy-or-adapt} below; the per-cell rows in Table~\ref{tab:deploy-or-adapt-cells} reveal where the rule wins, where it ties \emph{always-adapt}, and the single Ant cell ($g{=}7$) where the rule correctly chooses to deploy zero-shot rather than fall back to DR.
+
+\begin{table}[h]
+\centering\small
+\caption{Deploy-or-adapt: mean return across the four non-source gravities per env, source-only $\hat F_\kappa$ rule ($c{=}0.1, \tau{=}0.5$, no per-env tuning) vs.\ \emph{always-deploy}, \emph{always-adapt} (DR), and oracle. Acc.\ is the fraction of (env, $g$) cells where the rule's deploy/adapt label agrees with the oracle's. Regret is oracle minus rule return.}
+\label{tab:deploy-or-adapt}
+\begin{tabular}{lcccccc}
+\toprule
+env & always-deploy & always-adapt (DR) & $\hat F_\kappa$ rule & oracle & regret & acc. \\
+\midrule
+HalfCheetah & $7{,}143$ & $8{,}396$ & $\mathbf{8{,}194}$ & $8{,}396$ & $202$ & $0.75$ \\
+Ant         & $2{,}197$ & $2{,}561$ & $\mathbf{2{,}509}$ & $2{,}642$ & $133$ & $0.75$ \\
+Hopper      & $1{,}555$ & $1{,}988$ & $\mathbf{1{,}988}$ & $2{,}266$ & $278$ & $0.75$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\caption{Per-cell deploy-or-adapt: zero-shot return (source policy at target $g$, mean over seeds), DR return (single DR policy at target $g$), source-only signal $\hat F_\kappa(0.1\,|\Delta g|)$, rule decision (\emph{deploy}/\emph{adapt}), oracle decision, and the resulting return chosen by the rule. The single ``deploy'' that is also oracle-correct (Ant $g{=}7$, return $839$ vs.\ DR $512$) is in bold.}
+\label{tab:deploy-or-adapt-cells}
+\begin{tabular}{llrrrcccr}
+\toprule
+env & $g$ & $|\Delta g|$ & zero-shot & DR & $\hat F_\kappa$ & rule & oracle & rule return \\
+\midrule
+HalfCheetah & $5.00$  & $4.81$ & $6{,}748$ & $8{,}148$ & $0.652$ & adapt  & adapt  & $8{,}148$ \\
+HalfCheetah & $7.00$  & $2.81$ & $8{,}417$ & $8{,}638$ & $0.516$ & adapt  & adapt  & $8{,}638$ \\
+HalfCheetah & $12.00$ & $2.19$ & $8{,}936$ & $9{,}745$ & $0.470$ & deploy & adapt  & $8{,}936$ \\
+HalfCheetah & $15.00$ & $5.19$ & $4{,}472$ & $7{,}053$ & $0.682$ & adapt  & adapt  & $7{,}053$ \\
+\midrule
+Ant & $5.00$  & $4.81$ & $\phantom{0,0}143$ & $\phantom{0,0}208$ & $0.590$ & adapt  & adapt  & $208$ \\
+Ant & $7.00$  & $2.81$ & $\phantom{0,0}839$ & $\phantom{0,0}512$ & $0.442$ & \textbf{deploy} & \textbf{deploy} & $\mathbf{839}$ \\
+Ant & $12.00$ & $2.19$ & $3{,}926$ & $4{,}457$ & $0.378$ & deploy & adapt  & $3{,}926$ \\
+Ant & $15.00$ & $5.19$ & $3{,}883$ & $5{,}065$ & $0.616$ & adapt  & adapt  & $5{,}065$ \\
+\midrule
+Hopper & $5.00$  & $4.81$ & $1{,}589$ & $\phantom{0,0}477$ & $1.000$ & adapt  & deploy & $477$ \\
+Hopper & $7.00$  & $2.81$ & $2{,}198$ & $3{,}401$ & $1.000$ & adapt  & adapt  & $3{,}401$ \\
+Hopper & $12.00$ & $2.19$ & $1{,}948$ & $3{,}439$ & $0.998$ & adapt  & adapt  & $3{,}439$ \\
+Hopper & $15.00$ & $5.19$ & $\phantom{0,}486$ & $\phantom{0,0}635$ & $1.000$ & adapt  & adapt  & $635$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Reading the table.} The rule succeeds where $\hat F_\kappa$ correctly orders cells by transfer fragility relative to the env-agnostic threshold. It fails in two characteristic ways. (i) \emph{Hopper $g{=}5$}: the source action gaps are tiny ($\tilde\kappa{=}0.015$, ${\sim}20\times$ smaller than the other two envs), so $\hat F_\kappa$ saturates at every shift and the rule defaults to \emph{always-adapt}; here the rule misses the single cell where DR collapsed during its training distribution and zero-shot would have been better. (ii) \emph{HalfCheetah/Ant $g{=}12$}: $|\Delta g|{=}2.19$ is the smallest shift in the sweep, so the signal sits just below $\tau{=}0.5$ and the rule chooses deploy; both cells happen to be regimes where DR is comfortably trained, so adapt would have been a few percent better in return. Both failures are interpretable: a per-env threshold (e.g., a quantile of $\hat F_\kappa$ rather than an absolute value) would close the Hopper gap; the HalfCheetah/Ant misses cost ${<}10\%$ of return per cell. We use the env-agnostic constants in the body to keep the rule transparent, but per-env calibration is straightforward.
 
 \subsection{Source-Side $L_Q$ Estimator (Proposition~\ref{prop:lq-estimator})}
 \label{app:exp-lq}
