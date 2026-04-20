@@ -19,6 +19,38 @@
 
 set -eu
 
+# ------------------------------------------------------------
+# Environment install (one-time).
+# Host: CUDA 13.0 driver, cuDNN 9.19.0, 2x A100.
+# PyTorch cu128 wheels are forward-compatible with CUDA 13.0 driver.
+# Set SKIP_INSTALL=1 to skip; set FORCE_INSTALL=1 to always run.
+# By default, installs only if torch is missing.
+# ------------------------------------------------------------
+if [ "${SKIP_INSTALL:-0}" != "1" ]; then
+  NEED_INSTALL=0
+  if [ "${FORCE_INSTALL:-0}" = "1" ]; then
+    NEED_INSTALL=1
+  else
+    python -c "import torch, stable_baselines3, gymnasium, mujoco" 2>/dev/null \
+      || NEED_INSTALL=1
+  fi
+  if [ "${NEED_INSTALL}" = "1" ]; then
+    echo ">>> Installing Python deps (CUDA 13.0 / cuDNN 9.19 / 2x A100)..."
+    python -m pip install --upgrade pip
+    python -m pip install --index-url https://download.pytorch.org/whl/cu128 \
+      torch
+    python -m pip install \
+      stable-baselines3==2.8.0 \
+      gymnasium==1.2.3 \
+      mujoco==3.1.6 \
+      numpy \
+      matplotlib
+    echo ">>> Install done."
+  else
+    echo ">>> Deps already present; skipping install. (Use FORCE_INSTALL=1 to reinstall.)"
+  fi
+fi
+
 ENV_NAME="${1:-ant}"
 shift || true
 if [ "$#" -eq 0 ]; then
